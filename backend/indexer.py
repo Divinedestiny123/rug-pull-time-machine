@@ -19,21 +19,29 @@ def run_health_server():
 
 if __name__ == "__main__":
     # 1. Start the Health Server in a BACKGROUND thread
-    # This allows the script to continue to the next line immediately
+    # The 'daemon=True' ensures this thread dies if the main script stops
     print("🧵 Starting Health Check background thread...")
-    daemon_thread = threading.Thread(target=run_health_server, daemon=True)
-    daemon_thread.start()
+    threading.Thread(target=run_health_server, daemon=True).start()
 
-    # 2. Give it a second to breathe
-    time.sleep(2)
+    # 2. Give the thread a split second to start up
+    time.sleep(1)
 
-    # 3. NOW start your actual AI Watchtower loop
-    # This will run in the "Foreground"
+    # 3. NOW start your Watchtower AI in the FOREGROUND
+    # This is where the script will stay and loop through blocks
     print("🚀 Godseye Watchtower AI Initializing...")
     
-    # Put your Web3 connection and 'while True' loop here!
-    # Example:
-    # start_scanning_blocks()
+    # CALL YOUR MAIN AI FUNCTION HERE
+    # If your scanning code is inside a function called 'main_loop()', call it:
+    # main_loop() 
+    
+    # --- OR, if your while True loop is right here, keep it here: ---
+    while True:
+        try:
+            # Your Web3 / Scanning logic
+            print("🧱 Scanning Mantle Network...")
+            time.sleep(12)
+        except Exception as e:
+            print(f"Error: {e}")
 # 2. THE ACTUAL AI WATCHTOWER LOGIC
 def start_watchtower():
     print("🚀 Godseye Watchtower AI Initializing...")
