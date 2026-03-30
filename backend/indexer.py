@@ -15,8 +15,25 @@ def run_health_server():
     port = int(os.environ.get("PORT", 8080))
     server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
     print(f"📡 Render Health Check started on port {port}")
-    server.serve_forever()
+    server.serve_forever() # This line "pauses" the thread it is in
 
+if __name__ == "__main__":
+    # 1. Start the Health Server in a BACKGROUND thread
+    # This allows the script to continue to the next line immediately
+    print("🧵 Starting Health Check background thread...")
+    daemon_thread = threading.Thread(target=run_health_server, daemon=True)
+    daemon_thread.start()
+
+    # 2. Give it a second to breathe
+    time.sleep(2)
+
+    # 3. NOW start your actual AI Watchtower loop
+    # This will run in the "Foreground"
+    print("🚀 Godseye Watchtower AI Initializing...")
+    
+    # Put your Web3 connection and 'while True' loop here!
+    # Example:
+    # start_scanning_blocks()
 # 2. THE ACTUAL AI WATCHTOWER LOGIC
 def start_watchtower():
     print("🚀 Godseye Watchtower AI Initializing...")
