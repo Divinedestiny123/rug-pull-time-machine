@@ -1,123 +1,58 @@
 import os
-import time
-from web3 import Web3
-from dotenv import load_dotenv
-from http.server import HTTPServer, BaseHTTPRequestHandler
 import threading
+import time
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from web3 import Web3
 
+# 1. THE HEALTH SERVER (REQUIRED FOR RENDER FREE TIER)
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
-        self.send_header("Content-type", "text/html")
         self.end_headers()
-        self.wfile.write(b"Watchtower AI is Online")
+        self.wfile.write(b"ALIVE")
 
 def run_health_server():
-    # Render automatically provides a PORT environment variable
     port = int(os.environ.get("PORT", 8080))
     server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
-    print(f"📡 Render Health Check Live on Port {port}")
+    print(f"📡 Render Health Check started on port {port}")
     server.serve_forever()
 
-# This starts the server in the background so your loop can run below it
-threading.Thread(target=run_health_server, daemon=True).start()
-# ---------------------------------------
-
-# --- YOUR EXISTING AI LOGIC START ---
-def main():
-    print("🚀 Godseye Watchtower starting...")
-    while True:
-        try:
-            # Your logic for scanning blocks and checking for rug-pulls
-            print("Scanning Mantle Network...")
-            
-            # Example: check_for_rugs()
-            
-            time.sleep(12) # Wait for next block
-        except Exception as e:
-            print(f"Error: {e}")
-            time.sleep(10)
-
-if __name__ == "__main__":
-    main()
-    
-# Fake server to satisfy Render's health check
-def run_fake_server():
-    server = HTTPServer(('0.0.0.0', int(os.environ.get("PORT", 8080))), BaseHTTPRequestHandler)
-    server.serve_forever()
-
-threading.Thread(target=run_fake_server, daemon=True).start()
-
-# NEW: Import the brain we just built!
-from heuristics import evaluate_threat_level
-
-load_dotenv()
-
-# We pull the live RPC URL from your .env file
-RPC_URL = os.getenv("MANTLE_RPC_URL")
-web3 = Web3(Web3.HTTPProvider(RPC_URL))
-
-# --- THE VAULT & WATCHTOWER CREDENTIALS ---
-# Your newly deployed contract on the live Mantle Sepolia network
-VAULT_ADDRESS = "0x19470B76BD2B01Fd7F6C54a29CCD07161CDaE310"
-# Securely pulling your MetaMask key from the .env file
-AI_PRIVATE_KEY = os.getenv("PRIVATE_KEY") 
-AI_PUBLIC_ADDRESS = "0x77b328Df6b0649c0cDA166e5DdDdE7caC029d44d"
-
-# --- THE TARGETS ---
-# In a full app, these would be dynamically pulled from your Supabase database 
-# based on what tokens your users have deposited into the Vault.
-# For now, we will use placeholder addresses to represent a sketchy dev and their token.
-TARGET_DEV_WALLET = "0x1234567890123456789012345678901234567890" 
-TARGET_TOKEN_CONTRACT = "0x0987654321098765432109876543210987654321"
-
+# 2. THE ACTUAL AI WATCHTOWER LOGIC
 def start_watchtower():
+    print("🚀 Godseye Watchtower AI Initializing...")
+    
+    # Connect to Mantle
+    rpc_url = os.environ.get("MANTLE_RPC_URL")
+    web3 = Web3(Web3.HTTPProvider(rpc_url))
+    
     if not web3.is_connected():
-        print("❌ CRITICAL: Failed to connect to the Mantle Network.")
+        print("❌ FAILED to connect to Mantle. Check your RPC_URL variable!")
         return
 
-    print(f"✅ Connected to Mantle Network! Node: {web3.client_version}")
-    print(f"🛡️  Guarding Vault at: {VAULT_ADDRESS}")
-    print(f"🎯 Locking radar on Dev Wallet: {TARGET_DEV_WALLET}")
-    print("👁️  Watchtower is online. Scanning for new blocks...\n")
-
-    latest_known_block = web3.eth.block_number - 5
-    
-    print(f"Rewinding 5 blocks to {latest_known_block} to ensure nothing was missed...")
+    print(f"✅ Connected to Mantle. Monitoring from block {web3.eth.block_number}")
+    latest_block = web3.eth.block_number - 1
 
     while True:
         try:
             current_block = web3.eth.block_number
-            
-            if current_block > latest_known_block:
+            if current_block > latest_block:
+                # THIS IS THE LOG WE ARE LOOKING FOR
                 print(f"🧱 [BLOCK {current_block}] Intercepted and scanning...")
                 
-                block_data = web3.eth.get_block(current_block, full_transactions=True)
+                # --- YOUR HEURISTICS LOGIC GOES HERE ---
+                # (The part where you loop through transactions)
                 
-                # --- THE ANALYSIS LOOP ---
-                # We crack open the block and look at every transaction inside
-                for tx in block_data.transactions:
-                    
-                    # web3.py returns dictionary-like objects, we need the sender ('from') and receiver ('to')
-                    tx_sender = tx.get('from', '').lower()
-                    tx_receiver = tx.get('to', '')
-                    if tx_receiver:
-                        tx_receiver = tx_receiver.lower()
-                    
-                    # OPTIMIZATION: Only run the heavy AI math if the transaction involves our target dev or token
-                    if tx_sender == TARGET_DEV_WALLET.lower() or tx_receiver == TARGET_TOKEN_CONTRACT.lower():
-                        print(f"   🔍 Target activity detected! TxHash: {tx['hash'].hex()}")
-                        
-                        # Feed the raw transaction data into the heuristics brain
-                        evaluate_threat_level(tx, TARGET_DEV_WALLET, TARGET_TOKEN_CONTRACT)
-
-                latest_known_block = current_block
+                latest_block = current_block
             
-            time.sleep(2)
-            
+            time.sleep(2) # Mantle blocks are fast!
         except Exception as e:
-            print(f"⚠️ Network glitch or error: {e}")
+            print(f"⚠️ Loop Error: {e}")
             time.sleep(5)
 
+# 3. THE "LAUNCHPAD"
 if __name__ == "__main__":
+    # Start Health Server in a separate thread
+    threading.Thread(target=run_health_server, daemon=True).start()
+    
+    # Run the Watchtower in the main thread
     start_watchtower()
