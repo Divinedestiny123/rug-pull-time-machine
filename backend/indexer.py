@@ -2,6 +2,51 @@ import os
 import time
 from web3 import Web3
 from dotenv import load_dotenv
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
+
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/html")
+        self.end_headers()
+        self.wfile.write(b"Watchtower AI is Online")
+
+def run_health_server():
+    # Render automatically provides a PORT environment variable
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+    print(f"📡 Render Health Check Live on Port {port}")
+    server.serve_forever()
+
+# This starts the server in the background so your loop can run below it
+threading.Thread(target=run_health_server, daemon=True).start()
+# ---------------------------------------
+
+# --- YOUR EXISTING AI LOGIC START ---
+def main():
+    print("🚀 Godseye Watchtower starting...")
+    while True:
+        try:
+            # Your logic for scanning blocks and checking for rug-pulls
+            print("Scanning Mantle Network...")
+            
+            # Example: check_for_rugs()
+            
+            time.sleep(12) # Wait for next block
+        except Exception as e:
+            print(f"Error: {e}")
+            time.sleep(10)
+
+if __name__ == "__main__":
+    main()
+    
+# Fake server to satisfy Render's health check
+def run_fake_server():
+    server = HTTPServer(('0.0.0.0', int(os.environ.get("PORT", 8080))), BaseHTTPRequestHandler)
+    server.serve_forever()
+
+threading.Thread(target=run_fake_server, daemon=True).start()
 
 # NEW: Import the brain we just built!
 from heuristics import evaluate_threat_level
