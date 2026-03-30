@@ -8,8 +8,16 @@ from heuristics import evaluate_threat_level
 
 load_dotenv()
 
+# We pull the live RPC URL from your .env file
 RPC_URL = os.getenv("MANTLE_RPC_URL")
 web3 = Web3(Web3.HTTPProvider(RPC_URL))
+
+# --- THE VAULT & WATCHTOWER CREDENTIALS ---
+# Your newly deployed contract on the live Mantle Sepolia network
+VAULT_ADDRESS = "0x19470B76BD2B01Fd7F6C54a29CCD07161CDaE310"
+# Securely pulling your MetaMask key from the .env file
+AI_PRIVATE_KEY = os.getenv("PRIVATE_KEY") 
+AI_PUBLIC_ADDRESS = "0x77b328Df6b0649c0cDA166e5DdDdE7caC029d44d"
 
 # --- THE TARGETS ---
 # In a full app, these would be dynamically pulled from your Supabase database 
@@ -24,21 +32,24 @@ def start_watchtower():
         return
 
     print(f"✅ Connected to Mantle Network! Node: {web3.client_version}")
+    print(f"🛡️  Guarding Vault at: {VAULT_ADDRESS}")
     print(f"🎯 Locking radar on Dev Wallet: {TARGET_DEV_WALLET}")
     print("👁️  Watchtower is online. Scanning for new blocks...\n")
 
-    latest_known_block = web3.eth.block_number
+    latest_known_block = web3.eth.block_number - 5
+    
+    print(f"Rewinding 5 blocks to {latest_known_block} to ensure nothing was missed...")
 
     while True:
         try:
             current_block = web3.eth.block_number
             
             if current_block > latest_known_block:
-                print(f"🧱 [BLOCK {current_block}] Intercepted.")
+                print(f"🧱 [BLOCK {current_block}] Intercepted and scanning...")
                 
                 block_data = web3.eth.get_block(current_block, full_transactions=True)
                 
-                # --- NEW: THE ANALYSIS LOOP ---
+                # --- THE ANALYSIS LOOP ---
                 # We crack open the block and look at every transaction inside
                 for tx in block_data.transactions:
                     

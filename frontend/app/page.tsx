@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { ethers } from 'ethers';
-import { Shield, Activity, Lock, AlertTriangle, Terminal, LayoutDashboard, Settings, Search, Bell, Wallet, X, ChevronRight, LogOut, Database, Sliders } from 'lucide-react';
+import { Eye, Activity, Lock, AlertTriangle, Terminal, LayoutDashboard, Settings, Search, Bell, Wallet, X, ChevronRight, LogOut, Database, Sliders } from 'lucide-react';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -168,8 +168,8 @@ export default function Dashboard() {
       {/* SIDEBAR */}
       <aside className="w-64 bg-neutral-900/50 border-r border-neutral-800 flex flex-col z-10">
         <div className="h-20 flex items-center px-6 border-b border-neutral-800">
-          <Shield className="w-8 h-8 text-red-500 mr-3" />
-          <span className="text-xl font-bold text-white tracking-wider">VAULT<span className="text-red-500">OS</span></span>
+          <Eye className="w-8 h-8 text-red-500 mr-3" />
+          <span className="text-xl font-bold text-white tracking-wider">GODS<span className="text-red-500">EYE</span></span>
         </div>
         <nav className="flex-1 p-4 space-y-2">
           <NavButton id="dashboard" icon={LayoutDashboard} label="Dashboard" />
@@ -255,7 +255,7 @@ export default function Dashboard() {
                   <div className="text-3xl font-bold text-white">{walletAddress ? "$142,850" : "$0"}<span className="text-sm text-neutral-500 font-normal">.00</span></div>
                 </div>
                 <div className="p-6 bg-neutral-900/50 border border-neutral-800 rounded-xl">
-                  <div className="text-neutral-500 text-sm mb-2 flex items-center justify-between">Threats Intercepted <Shield className="w-4 h-4 text-red-500" /></div>
+                  <div className="text-neutral-500 text-sm mb-2 flex items-center justify-between">Threats Intercepted <Eye className="w-4 h-4 text-red-500" /></div>
                   <div className="text-3xl font-bold text-white">{alerts.length}</div>
                 </div>
                 <div className="p-6 bg-neutral-900/50 border border-neutral-800 rounded-xl relative overflow-hidden group">
