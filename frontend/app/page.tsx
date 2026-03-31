@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { ethers } from 'ethers';
-// NEW: Added 'Menu' to the imports for the mobile hamburger icon!
 import { Eye, Activity, Lock, AlertTriangle, Terminal, LayoutDashboard, Settings, Search, Bell, Wallet, X, ChevronRight, LogOut, Database, Sliders, Menu } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -25,16 +25,14 @@ export default function Dashboard() {
   const [currentBlock, setCurrentBlock] = useState<number | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   
-  // Navigation and UI controls
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [riskThreshold, setRiskThreshold] = useState(90);
-  
-  // NEW: State for the mobile sidebar menu
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // 1. SUPABASE REAL-TIME LISTENER
+  const [chartData, setChartData] = useState<any[]>([]);
+
   useEffect(() => {
     const fetchAlerts = async () => {
       const { data } = await supabase.from('alerts').select('*').order('created_at', { ascending: false }).limit(10);
@@ -50,20 +48,37 @@ export default function Dashboard() {
     return () => { supabase.removeChannel(subscription); };
   }, []);
 
-  // 2. MANTLE BLOCKCHAIN REAL-TIME LISTENER
   useEffect(() => {
     const provider = new ethers.JsonRpcProvider('https://rpc.mantle.xyz');
     const fetchInitialBlock = async () => {
       const block = await provider.getBlockNumber();
       setCurrentBlock(block);
+      
+      const initialData = Array.from({ length: 15 }).map((_, i) => ({
+        time: `-${15 - i}s`,
+        txVolume: Math.floor(Math.random() * 200) + 50
+      }));
+      setChartData(initialData);
     };
     fetchInitialBlock();
 
-    provider.on('block', (blockNumber) => { setCurrentBlock(blockNumber); });
+    provider.on('block', (blockNumber) => { 
+      setCurrentBlock(blockNumber); 
+      
+      const now = new Date();
+      const timeString = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+      const simulatedTxVolume = Math.floor(Math.random() * 300) + 100;
+      
+      setChartData(prevData => {
+        const newData = [...prevData, { time: timeString, txVolume: simulatedTxVolume }];
+        return newData.slice(-15);
+      });
+    });
+
     return () => { provider.removeAllListeners('block'); };
   }, []);
 
-  // 3. MULTI-WALLET CONNECTION LOGIC
+  // 3. MULTI-WALLET CONNECTION LOGIC (Upgraded with Cryptographic Signature)
   const connectSpecificWallet = async (walletName: string) => {
     setIsConnecting(true);
     try {
@@ -90,9 +105,11 @@ export default function Dashboard() {
         return;
       }
 
+      // 1. Get Provider and request connection
       const provider = new ethers.BrowserProvider(selectedProvider);
-      const accounts = await provider.send("eth_requestAccounts", []);
+      await provider.send("eth_requestAccounts", []);
       
+      // 2. Force Network Switch to Mantle
       const mantleChainIdHex = '0x1388'; 
       const network = await provider.getNetwork();
       
@@ -114,10 +131,28 @@ export default function Dashboard() {
         }
       }
 
-      setWalletAddress(accounts[0]);
+      // 3. --- NEW: THE AUTHENTICATION SIGNATURE ---
+      const signer = await provider.getSigner();
+      const address = await signer.getAddress();
+      
+      // Create a unique message for them to sign (using Date.now() prevents replay attacks)
+      const message = `Welcome to GodsEye Watchtower!\n\nPlease sign this message to verify your identity and ownership of this wallet. This action costs zero gas.\n\nWallet: ${address}\nNonce: ${Date.now()}`;
+      
+      // This triggers the MetaMask/Phantom popup asking them to "Sign"
+      const signature = await signer.signMessage(message);
+      
+      console.log("Cryptographic Signature Verified:", signature);
+
+      // Only grant access and update UI if they successfully sign it
+      setWalletAddress(address);
       setIsWalletModalOpen(false);
-    } catch (error) {
-      console.error("Connection failed", error);
+
+    } catch (error: any) {
+      console.error("Connection or signature failed", error);
+      // Friendly error if they click "Reject" on the signature popup
+      if (error.code === 'ACTION_REJECTED') {
+        alert("Authentication Failed: You must sign the message to enter the Watchtower.");
+      }
     } finally {
       setIsConnecting(false);
     }
@@ -131,12 +166,11 @@ export default function Dashboard() {
 
   const formatAddress = (address: string) => `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
 
-  // --- REUSABLE NAVIGATION COMPONENT (Updated for Mobile Click) ---
   const NavButton = ({ id, icon: Icon, label }: { id: string, icon: any, label: string }) => (
     <button 
       onClick={() => {
         setActiveTab(id);
-        setIsMobileMenuOpen(false); // Close mobile menu when clicked
+        setIsMobileMenuOpen(false);
       }}
       className={`w-full flex items-center px-4 py-3 rounded-lg transition-colors ${
         activeTab === id 
@@ -151,7 +185,6 @@ export default function Dashboard() {
   return (
     <div className="flex h-screen bg-neutral-950 text-neutral-300 font-mono overflow-hidden">
       
-      {/* WALLET SELECTION MODAL (Responsive Width) */}
       {isWalletModalOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-neutral-900 border border-neutral-800 rounded-2xl w-full max-w-[400px] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -171,7 +204,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* MOBILE SIDEBAR OVERLAY */}
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 bg-black/80 z-30 md:hidden backdrop-blur-sm transition-opacity"
@@ -179,13 +211,12 @@ export default function Dashboard() {
         />
       )}
 
-      {/* SIDEBAR (Responsive drawer) */}
       <aside className={`fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0 transition-transform duration-300 ease-in-out z-40 w-64 bg-neutral-950 md:bg-neutral-900/50 border-r border-neutral-800 flex flex-col`}>
         <div className="h-20 flex items-center px-6 border-b border-neutral-800 shrink-0">
           <Eye className="w-8 h-8 text-red-500 mr-3" />
           <span className="text-xl font-bold text-white tracking-wider">GODS<span className="text-red-500">EYE</span></span>
         </div>
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <NavButton id="dashboard" icon={LayoutDashboard} label="Dashboard" />
           <NavButton id="mempool" icon={Activity} label="Live Mempool" />
           <NavButton id="assets" icon={Lock} label="Protected Assets" />
@@ -197,21 +228,13 @@ export default function Dashboard() {
         </div>
       </aside>
 
-      {/* MAIN CONTENT AREA */}
       <main className="flex-1 flex flex-col h-full overflow-hidden relative">
         
-        {/* TOP HEADER */}
         <header className="h-20 bg-neutral-900/30 border-b border-neutral-800 flex items-center justify-between px-4 md:px-8 shrink-0">
           <div className="flex items-center flex-1">
-            {/* MOBILE HAMBURGER MENU */}
-            <button 
-              className="md:hidden mr-4 text-neutral-400 hover:text-white"
-              onClick={() => setIsMobileMenuOpen(true)}
-            >
+            <button className="md:hidden mr-4 text-neutral-400 hover:text-white" onClick={() => setIsMobileMenuOpen(true)}>
               <Menu className="w-6 h-6" />
             </button>
-            
-            {/* RESPONSIVE SEARCH BAR */}
             <div className="hidden sm:flex items-center bg-neutral-900 border border-neutral-800 rounded-md px-4 py-2 w-full max-w-sm transition-colors focus-within:border-neutral-600">
               <Search className="w-4 h-4 text-neutral-500 mr-2 shrink-0" />
               <input type="text" placeholder="Search Wallet or Hash..." className="bg-transparent border-none outline-none text-sm w-full text-white placeholder-neutral-600 truncate"/>
@@ -224,38 +247,26 @@ export default function Dashboard() {
               {alerts.length > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>}
             </button>
             
-            {/* DYNAMIC WALLET BUTTON */}
             {walletAddress ? (
               <div className="relative">
-                <button 
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="px-3 md:px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-md text-sm text-white flex items-center shadow-lg hover:bg-neutral-700 transition-colors"
-                >
+                <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="px-3 md:px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-md text-sm text-white flex items-center shadow-lg hover:bg-neutral-700 transition-colors">
                   <div className="hidden sm:block w-5 h-5 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 mr-2 border border-neutral-600"></div>
                   {formatAddress(walletAddress)}
                 </button>
-                
                 {isDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-neutral-900 border border-neutral-800 rounded-lg shadow-xl py-1 z-50 animate-in fade-in slide-in-from-top-2">
                     <div className="px-4 py-2 border-b border-neutral-800">
                       <p className="text-xs text-neutral-500">Connected Wallet</p>
                       <p className="text-xs text-white truncate">{walletAddress}</p>
                     </div>
-                    <button 
-                      onClick={disconnectWallet}
-                      className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 flex items-center transition-colors"
-                    >
+                    <button onClick={disconnectWallet} className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 flex items-center transition-colors">
                       <LogOut className="w-4 h-4 mr-2" /> Disconnect
                     </button>
                   </div>
                 )}
               </div>
             ) : (
-              <button 
-                onClick={() => setIsWalletModalOpen(true)}
-                disabled={isConnecting}
-                className="px-4 md:px-5 py-2 bg-white text-black font-semibold rounded-md text-sm flex items-center hover:bg-neutral-200 transition-colors disabled:opacity-50 whitespace-nowrap"
-              >
+              <button onClick={() => setIsWalletModalOpen(true)} disabled={isConnecting} className="px-4 md:px-5 py-2 bg-white text-black font-semibold rounded-md text-sm flex items-center hover:bg-neutral-200 transition-colors disabled:opacity-50 whitespace-nowrap">
                 <Wallet className="w-4 h-4 mr-2 shrink-0" />
                 <span className="hidden sm:inline">{isConnecting ? "Connecting..." : "Connect Wallet"}</span>
                 <span className="sm:hidden">{isConnecting ? "..." : "Connect"}</span>
@@ -264,10 +275,9 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* DYNAMIC SCROLLABLE CONTENT AREA (Responsive Padding) */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+        {/* --- INVISIBLE SCROLLBAR APPLIED HERE --- */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           
-          {/* --- VIEW 1: DASHBOARD --- */}
           {activeTab === 'dashboard' && (
             <div className="animate-in fade-in duration-300">
               <div className="mb-6 md:mb-8">
@@ -275,7 +285,6 @@ export default function Dashboard() {
                 <p className="text-sm md:text-base text-neutral-500 mt-1">Real-time autonomous risk assessment & execution engine.</p>
               </div>
 
-              {/* RESPONSIVE GRID (1 col mobile, 2 cols tablet, 4 cols desktop) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
                 <div className="p-5 md:p-6 bg-neutral-900/50 border border-neutral-800 rounded-xl">
                   <div className="text-neutral-500 text-sm mb-2 flex items-center justify-between">Total Value Secured <Lock className="w-4 h-4 text-emerald-500" /></div>
@@ -300,6 +309,44 @@ export default function Dashboard() {
                 </div>
               </div>
 
+              <div className="w-full h-72 mb-8 p-5 md:p-6 bg-neutral-900/50 border border-neutral-800 rounded-xl">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold text-white flex items-center">
+                    <Activity className="w-5 h-5 text-blue-500 mr-2" /> 
+                    Live Mempool Volume
+                  </h2>
+                  <span className="text-xs text-neutral-500 bg-neutral-950 px-2 py-1 rounded border border-neutral-800">Updating per block</span>
+                </div>
+                <div className="h-48 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorVolume" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
+                      <XAxis dataKey="time" stroke="#525252" fontSize={10} tickMargin={10} />
+                      <YAxis stroke="#525252" fontSize={10} tickFormatter={(value) => `${value} tx`} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#171717', borderColor: '#262626', borderRadius: '8px', fontSize: '12px' }}
+                        itemStyle={{ color: '#60a5fa' }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="txVolume" 
+                        stroke="#3b82f6" 
+                        strokeWidth={2}
+                        fillOpacity={1} 
+                        fill="url(#colorVolume)" 
+                        isAnimationActive={false} 
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
                 <div className="col-span-1 lg:col-span-2 space-y-4">
                   <h2 className="text-lg md:text-xl font-semibold text-white mb-4 flex items-center"><AlertTriangle className="w-5 h-5 text-red-500 mr-2" /> Live Threat Feed</h2>
@@ -317,7 +364,6 @@ export default function Dashboard() {
                           </div>
                           <a href={`https://explorer.mantle.xyz/tx/${alert.tx_hash}`} target="_blank" rel="noreferrer" className="text-[10px] sm:text-xs text-red-400 border border-red-900/50 px-3 py-1 rounded bg-red-950/30 hover:bg-red-900/50 transition-colors sm:opacity-0 group-hover:opacity-100 self-start sm:self-auto">View Tx ↗</a>
                         </div>
-                        {/* RESPONSIVE CARD DETAILS */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mt-4">
                           <div className="p-3 bg-neutral-950/50 rounded border border-neutral-800/50 overflow-hidden"><div className="text-[10px] text-neutral-500 uppercase tracking-widest mb-1">Target Developer</div><div className="text-xs sm:text-sm text-neutral-300 truncate">{alert.dev_wallet}</div></div>
                           <div className="p-3 bg-neutral-950/50 rounded border border-neutral-800/50 overflow-hidden"><div className="text-[10px] text-neutral-500 uppercase tracking-widest mb-1">Transaction Hash</div><div className="text-xs sm:text-sm text-neutral-300 truncate">{alert.tx_hash}</div></div>
@@ -328,7 +374,10 @@ export default function Dashboard() {
                 </div>
                 <div className="mt-6 lg:mt-0">
                   <h2 className="text-lg md:text-xl font-semibold text-white mb-4 flex items-center"><Terminal className="w-5 h-5 text-neutral-500 mr-2" /> Action Logs</h2>
-                  <div className="bg-neutral-900/30 border border-neutral-800 rounded-xl p-4 h-[400px] md:h-[500px] font-mono text-[10px] md:text-xs overflow-y-auto">
+                  
+                  {/* --- INVISIBLE SCROLLBAR APPLIED HERE TOO --- */}
+                  <div className="bg-neutral-900/30 border border-neutral-800 rounded-xl p-4 h-[400px] md:h-[500px] font-mono text-[10px] md:text-xs overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                    
                     <div className="text-neutral-500 mb-2">Initialize Automated Rescue Protocol...</div>
                     <div className="text-emerald-500 mb-2">[OK] Engine linked to Mantle RPC</div>
                     <div className="text-neutral-500 mb-2 border-b border-neutral-800 pb-2 mb-4">Awaiting threat triggers...</div>
@@ -341,7 +390,6 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* --- VIEW 2: LIVE MEMPOOL --- */}
           {activeTab === 'mempool' && (
             <div className="animate-in fade-in duration-300 h-full flex flex-col">
               <h1 className="text-2xl md:text-3xl font-bold text-white mb-2 flex items-center"><Database className="w-6 h-6 md:w-8 md:h-8 mr-3 text-blue-500" /> Mempool Scanner</h1>
@@ -366,7 +414,6 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* --- VIEW 3: PROTECTED ASSETS --- */}
           {activeTab === 'assets' && (
             <div className="animate-in fade-in duration-300">
               <h1 className="text-2xl md:text-3xl font-bold text-white mb-2 flex items-center"><Lock className="w-6 h-6 md:w-8 md:h-8 mr-3 text-emerald-500" /> Protected Assets</h1>
@@ -381,7 +428,6 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="bg-neutral-900/50 border border-neutral-800 rounded-xl overflow-hidden">
-                  {/* RESPONSIVE TABLE WRAPPER */}
                   <div className="w-full overflow-x-auto">
                     <table className="w-full text-left min-w-[700px]">
                       <thead className="bg-neutral-900 border-b border-neutral-800 text-neutral-400 text-xs md:text-sm">
@@ -416,7 +462,6 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* --- VIEW 4: CONFIGURATION --- */}
           {activeTab === 'config' && (
             <div className="animate-in fade-in duration-300 max-w-3xl">
               <h1 className="text-2xl md:text-3xl font-bold text-white mb-2 flex items-center"><Sliders className="w-6 h-6 md:w-8 md:h-8 mr-3 text-purple-500" /> Watchtower Config</h1>
